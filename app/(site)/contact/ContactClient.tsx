@@ -1,10 +1,12 @@
 'use client'
 import React, { useState } from 'react'
-import { Clock, BadgeDollarSign, Phone, Check, ArrowRight } from 'lucide-react'
+import { Clock, BadgeDollarSign, Phone, Check, ArrowRight, AlertCircle } from 'lucide-react'
 import Section from '@/components/ui/Section'
 import Eyebrow from '@/components/ui/Eyebrow'
 import Reveal from '@/components/ui/Reveal'
 import Button from '@/components/ui/Button'
+
+const FORMSPREE_ENDPOINT = 'https://formspree.io/f/mykagvdk'
 
 const TRUST = [
   { icon: Clock, title: '3–5 day delivery', desc: 'From kickoff to launch.' },
@@ -44,9 +46,34 @@ function Field({ label, value, onChange, placeholder, type = 'text', textarea, r
 
 export default function ContactClient() {
   const [form, setForm] = useState<FormState>({ name: '', email: '', phone: '', biz: '', project: '' })
-  const [sent, setSent] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const set = (k: keyof FormState) => (v: string) => setForm(s => ({ ...s, [k]: v }))
   const valid = form.name.trim() && form.email.trim() && form.biz.trim()
+
+  async function handleSubmit() {
+    if (!valid || status === 'submitting') return
+    setStatus('submitting')
+    try {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          business: form.biz,
+          message: form.project,
+        }),
+      })
+      if (res.ok) {
+        setStatus('success')
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
 
   return (
     <Section bg="var(--ink-800)" pad="0" style={{ minHeight: '100%' }}>
@@ -79,7 +106,7 @@ export default function ContactClient() {
 
         <div style={{ background: 'var(--bg-cream)', padding: 'clamp(40px,5vw,72px) clamp(28px,5vw,64px)', display: 'flex', alignItems: 'center' }}>
           <div style={{ width: '100%', maxWidth: 520, margin: '0 auto' }}>
-            {sent ? (
+            {status === 'success' ? (
               <Reveal>
                 <div style={{ textAlign: 'center', background: '#fff', borderRadius: 'var(--r-xl)', padding: '56px 36px', boxShadow: 'var(--shadow-md)' }}>
                   <div style={{ width: 64, height: 64, borderRadius: 99, background: 'var(--sage-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px' }}>
@@ -91,7 +118,7 @@ export default function ContactClient() {
                   <p style={{ margin: '12px 0 24px', fontSize: 16, lineHeight: 1.6, color: 'var(--fg-3)' }}>
                     We got your request and we&apos;ll reach out within one business day to schedule your free consultation.
                   </p>
-                  <Button variant="ghost" onClick={() => { setSent(false); setForm({ name: '', email: '', phone: '', biz: '', project: '' }) }}>
+                  <Button variant="ghost" onClick={() => { setStatus('idle'); setForm({ name: '', email: '', phone: '', biz: '', project: '' }) }}>
                     Submit another
                   </Button>
                 </div>
@@ -106,12 +133,18 @@ export default function ContactClient() {
                   </div>
                   <Field label="Business name" value={form.biz} onChange={set('biz')} placeholder="Eastside Barbershop" required />
                   <Field label="Tell us about your project" textarea value={form.project} onChange={set('project')} placeholder="What does your business do, and what do you need?" />
+                  {status === 'error' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 'var(--r-sm)', background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                      <AlertCircle size={16} color="#DC2626" />
+                      <span style={{ fontSize: 14, color: '#DC2626' }}>Something went wrong. Please try again or email us directly.</span>
+                    </div>
+                  )}
                   <Button
                     size="lg"
-                    onClick={() => valid && setSent(true)}
-                    style={{ width: '100%', justifyContent: 'center', opacity: valid ? 1 : 0.55, pointerEvents: valid ? 'auto' : 'none' }}
+                    onClick={handleSubmit}
+                    style={{ width: '100%', justifyContent: 'center', opacity: valid && status !== 'submitting' ? 1 : 0.55, pointerEvents: valid && status !== 'submitting' ? 'auto' : 'none' }}
                   >
-                    Schedule My Free Consultation <ArrowRight size={18} />
+                    {status === 'submitting' ? 'Sending…' : 'Schedule My Free Consultation'} {status !== 'submitting' && <ArrowRight size={18} />}
                   </Button>
                   <p style={{ margin: 0, textAlign: 'center', fontSize: 13, color: 'var(--fg-3)' }}>
                     We&apos;ll never share your info.
